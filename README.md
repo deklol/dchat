@@ -2,7 +2,7 @@
 
 Open source Discord/forum hybrid with public read access and member-only interaction.
 
-Current release baseline: `v1.2`
+Current release baseline: `v1.3`
 
 Live example:
 
@@ -40,8 +40,8 @@ There is no required worker process in the default release.
 
 Tracked source footprint:
 
-- `120` tracked files
-- about `0.39 MB` before dependencies, media, and generated static output
+- `134` tracked files
+- about `0.49 MB` before dependencies, media, and generated static output
 
 ## Quick start
 
@@ -78,29 +78,7 @@ That adds Redis and Caddy. With the full profile, the app is served on `http://l
 
 Choose that first email accordingly.
 
-## Public repo safety
-
-This repo is safe to publish only if you keep local/operator data out of version control.
-
-Do not commit:
-
-- `.env`
-- local databases
-- uploaded media
-- backups
-- generated static output
-- local editor/IDE files
-
-The provided `.gitignore` is set up for that split.
-
-## Operations
-
-Useful scripts:
-
-- `scripts/backup.sh` / `scripts/backup.ps1`
-- `scripts/restore.sh` / `scripts/restore.ps1`
-- `scripts/restore-test.sh` / `scripts/restore-test.ps1`
-- `scripts/e2e-smoke.sh` / `scripts/e2e-smoke.ps1`
+## Docs
 
 Runtime pages:
 

@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 
 
@@ -120,6 +121,11 @@ STORAGES = {
     },
 }
 
+if "test" in sys.argv:
+    STORAGES["staticfiles"] = {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    }
+
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
@@ -143,6 +149,10 @@ DEFAULT_TEXT_HEX = os.getenv("DEFAULT_TEXT_HEX", "#e5e7eb")
 DEFAULT_MUTED_TEXT_HEX = os.getenv("DEFAULT_MUTED_TEXT_HEX", "#9ca3af")
 DEFAULT_LINK_HEX = os.getenv("DEFAULT_LINK_HEX", "#7cc4ff")
 EMBED_PARENT_DOMAIN = os.getenv("EMBED_PARENT_DOMAIN", "localhost")
+KLIPY_APP_KEY = os.getenv("KLIPY_APP_KEY", "").strip()
+KLIPY_API_BASE = os.getenv("KLIPY_API_BASE", "https://api.klipy.com").strip() or "https://api.klipy.com"
+KLIPY_CONTENT_FILTER = os.getenv("KLIPY_CONTENT_FILTER", "medium").strip() or "medium"
+KLIPY_ATTRIBUTION_URL = "https://docs.klipy.com/attribution"
 
 if ENABLE_REDIS_CACHE:
     CACHES = {

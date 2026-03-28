@@ -22,6 +22,7 @@ from apps.forum.forms import PostForm, ThreadForm
 from apps.forum.models import (
     Attachment,
     Category,
+    ChatMessage,
     Mention,
     ModerationLog,
     ModerationWarning,
@@ -371,6 +372,10 @@ def thread_legacy_redirect(request: HttpRequest, thread_id: int) -> HttpResponse
 @permission_required("forum.add_thread", raise_exception=True)
 @rate_limit(key_prefix="thread_create", max_ip_hits=30, max_user_hits=20, window_seconds=60)
 def thread_create(request: HttpRequest) -> HttpResponse:
+    category_slug = (request.GET.get("category") or "").strip()
+    initial_category = None
+    if category_slug:
+        initial_category = Category.objects.filter(slug=category_slug, is_public=True).first()
     if request.method == "POST":
         form = ThreadForm(request.POST, request.FILES)
         if form.is_valid():
@@ -411,8 +416,16 @@ def thread_create(request: HttpRequest) -> HttpResponse:
             messages.success(request, "Thread created.")
             return redirect(thread)
     else:
-        form = ThreadForm()
-    return render(request, "forum/thread_create.html", {"form": form, "mentionable_users": mentionable_users_payload()})
+        form = ThreadForm(initial={"category": initial_category} if initial_category else None)
+    return render(
+        request,
+        "forum/thread_create.html",
+        {
+            "form": form,
+            "mentionable_users": mentionable_users_payload(),
+            "selected_category": initial_category,
+        },
+    )
 
 
 @login_required
@@ -649,6 +662,20 @@ def warn_user(request: HttpRequest) -> HttpResponse:
         )
         redirect_target = post.thread
         moderation_target = ("post", post.id)
+    elif target_type == "chat_message" and target_id > 0:
+        chat_message = get_object_or_404(ChatMessage.objects.select_related("room", "author"), id=target_id)
+        warned_user = chat_message.author
+        if warned_user.id == request.user.id:
+            messages.error(request, "You cannot warn yourself.")
+            return redirect_to_safe_next(request, chat_message.room.get_absolute_url())
+        warning = ModerationWarning.objects.create(
+            moderator=request.user,
+            user=warned_user,
+            chat_message=chat_message,
+            reason=note or "Moderator warning",
+        )
+        redirect_target = chat_message.room.get_absolute_url()
+        moderation_target = ("chat_message", chat_message.id)
     else:
         raise Http404("Invalid warning target")
 
@@ -658,6 +685,8 @@ def warn_user(request: HttpRequest) -> HttpResponse:
         kind="system",
         thread=warning.thread,
         post=warning.post,
+        chat_room=getattr(getattr(warning, "chat_message", None), "room", None),
+        chat_message=warning.chat_message,
         body=f"You were warned by a moderator and lost {warning.rep_penalty} rep.",
     )
     invalidate_notification_count(warned_user.id)
@@ -684,7 +713,7 @@ def report_content(request: HttpRequest) -> HttpResponse:
         target_id = 0
     reason = request.POST.get("reason", "").strip()[:200]
     details = request.POST.get("details", "").strip()[:2000]
-    if target_type not in {"thread", "post"} or target_id <= 0 or not reason:
+    if target_type not in {"thread", "post", "chat_message"} or target_id <= 0 or not reason:
         messages.error(request, "Invalid report request.")
         return redirect("forum:home")
     Report.objects.create(
@@ -747,7 +776,10 @@ def moderate_report(request: HttpRequest, report_id: int) -> HttpResponse:
 @require_POST
 def soft_delete_target(request: HttpRequest) -> HttpResponse:
     target_type = request.POST.get("target_type", "")
-    target_id = int(request.POST.get("target_id", "0"))
+    try:
+        target_id = int(request.POST.get("target_id", "0") or 0)
+    except (TypeError, ValueError):
+        raise Http404("Invalid target")
     note = request.POST.get("note", "").strip()[:200]
     now = timezone.now()
     if target_type == "thread":
@@ -758,6 +790,7 @@ def soft_delete_target(request: HttpRequest) -> HttpResponse:
         thread.deletion_reason = note or "moderator_action"
         thread.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "deletion_reason"])
         target_key = "thread"
+        fallback_url = thread.get_absolute_url()
     elif target_type == "post":
         post = get_object_or_404(Post, id=target_id)
         post.is_deleted = True
@@ -766,6 +799,16 @@ def soft_delete_target(request: HttpRequest) -> HttpResponse:
         post.deletion_reason = note or "moderator_action"
         post.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "deletion_reason"])
         target_key = "post"
+        fallback_url = post.thread.get_absolute_url()
+    elif target_type == "chat_message":
+        chat_message = get_object_or_404(ChatMessage, id=target_id)
+        chat_message.is_deleted = True
+        chat_message.deleted_at = now
+        chat_message.deleted_by = request.user
+        chat_message.deletion_reason = note or "moderator_action"
+        chat_message.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "deletion_reason"])
+        target_key = "chat_message"
+        fallback_url = f"{chat_message.room.get_absolute_url()}#chat-message-{chat_message.id}"
     else:
         raise Http404("Invalid target")
     ModerationLog.objects.create(
@@ -776,7 +819,7 @@ def soft_delete_target(request: HttpRequest) -> HttpResponse:
         notes=note,
     )
     messages.success(request, f"{target_key} soft-deleted.")
-    return redirect(request.META.get("HTTP_REFERER", "forum:home"))
+    return redirect_to_safe_next(request, fallback_url)
 
 
 @login_required
@@ -796,7 +839,10 @@ def hard_delete_thread(request: HttpRequest, thread_id: int) -> HttpResponse:
 @require_POST
 def restore_target(request: HttpRequest) -> HttpResponse:
     target_type = request.POST.get("target_type", "")
-    target_id = int(request.POST.get("target_id", "0"))
+    try:
+        target_id = int(request.POST.get("target_id", "0") or 0)
+    except (TypeError, ValueError):
+        raise Http404("Invalid target")
     if target_type == "thread":
         thread = get_object_or_404(Thread, id=target_id)
         thread.is_deleted = False
@@ -805,6 +851,7 @@ def restore_target(request: HttpRequest) -> HttpResponse:
         thread.deletion_reason = ""
         thread.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "deletion_reason"])
         target_key = "thread"
+        fallback_url = thread.get_absolute_url()
     elif target_type == "post":
         post = get_object_or_404(Post, id=target_id)
         post.is_deleted = False
@@ -813,6 +860,16 @@ def restore_target(request: HttpRequest) -> HttpResponse:
         post.deletion_reason = ""
         post.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "deletion_reason"])
         target_key = "post"
+        fallback_url = post.thread.get_absolute_url()
+    elif target_type == "chat_message":
+        chat_message = get_object_or_404(ChatMessage, id=target_id)
+        chat_message.is_deleted = False
+        chat_message.deleted_at = None
+        chat_message.deleted_by = None
+        chat_message.deletion_reason = ""
+        chat_message.save(update_fields=["is_deleted", "deleted_at", "deleted_by", "deletion_reason"])
+        target_key = "chat_message"
+        fallback_url = f"{chat_message.room.get_absolute_url()}#chat-message-{chat_message.id}"
     else:
         raise Http404("Invalid target")
     ModerationLog.objects.create(
@@ -822,7 +879,7 @@ def restore_target(request: HttpRequest) -> HttpResponse:
         target_id=target_id,
     )
     messages.success(request, f"{target_key} restored.")
-    return redirect(request.META.get("HTTP_REFERER", "forum:home"))
+    return redirect_to_safe_next(request, fallback_url)
 
 
 @login_required

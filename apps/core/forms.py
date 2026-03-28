@@ -9,6 +9,12 @@ User = get_user_model()
 
 
 class FirstRunSetupForm(forms.Form):
+    KLIPY_CONTENT_FILTER_CHOICES = (
+        ("low", "Low"),
+        ("medium", "Medium"),
+        ("high", "High"),
+    )
+
     site_name = forms.CharField(max_length=120)
     theme_preset = forms.ChoiceField(choices=SiteBranding.THEME_PRESETS, initial="default")
     accent_hex = forms.RegexField(regex=r"^#[0-9A-Fa-f]{6}$", max_length=7)
@@ -22,6 +28,12 @@ class FirstRunSetupForm(forms.Form):
         help_text="The first account becomes user id 1. This email is shown publicly on the legal pages by default."
     )
     admin_password = forms.CharField(widget=forms.PasswordInput())
+    klipy_app_key = forms.CharField(
+        max_length=255,
+        required=False,
+        help_text="Optional. Get a KLIPY key from partner.klipy.com if you want GIF search enabled at launch.",
+    )
+    klipy_content_filter = forms.ChoiceField(choices=KLIPY_CONTENT_FILTER_CHOICES, initial="medium", required=False)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -41,6 +53,9 @@ class FirstRunSetupForm(forms.Form):
         self.fields["admin_password"].widget.attrs.update(
             {"autocomplete": "new-password", "placeholder": "Admin password..."}
         )
+        self.fields["klipy_app_key"].widget.attrs.update(
+            {"spellcheck": "false", "placeholder": "Optional KLIPY API key..."}
+        )
 
     def save(self):
         user = User.objects.create_superuser(
@@ -59,6 +74,8 @@ class FirstRunSetupForm(forms.Form):
                 "text_hex": self.cleaned_data["text_hex"],
                 "muted_text_hex": self.cleaned_data["muted_text_hex"],
                 "link_hex": self.cleaned_data["link_hex"],
+                "klipy_app_key": self.cleaned_data["klipy_app_key"].strip(),
+                "klipy_content_filter": self.cleaned_data["klipy_content_filter"] or "medium",
             },
         )
         defaults = legal_document_defaults(self.cleaned_data["site_name"], self.cleaned_data["admin_email"])
@@ -179,6 +196,17 @@ class FirstRunSetupForm(forms.Form):
                             "- Linked the footer `dChat` brand text to the public GitHub repository\n"
                             "- Added per-conversation DM icons to the guild rail with a context menu action to hide chats from the rail\n"
                             "- Brought DMs closer to thread capability parity with markdown/link embeds and multiple image uploads"
+                        ),
+                    ),
+                    ChangeLogEntry(
+                        version="1.3",
+                        title="Category chatrooms and publish polish",
+                        body_markdown=(
+                            "- Added category-based live chatrooms with the latest three related topics pinned in the room header\n"
+                            "- Reworked chat message continuity so consecutive messages chain cleanly and only reset identity after a long gap\n"
+                            "- Moved chat message actions into a compact far-right hover affordance that no longer adds spacing between messages\n"
+                            "- Added Django admin KLIPY controls through Site Branding so GIF search can be enabled without editing env files\n"
+                            "- Removed the redundant top-nav Chatroom link and tightened the public-facing release docs"
                         ),
                     ),
                 ]

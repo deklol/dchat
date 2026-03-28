@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="workspace-grid workspace-grid-thread workspace-grid-chatroom">
+  <aside class="sidebar-pane stream-sidebar">
+    <section class="sidebar-section">
+      <div class="sidebar-heading-row">
+        <div class="sidebar-heading-main">
+          <a href="{% url 'forum:home' %}" class="mini-action mini-action-back" data-go-back aria-label="Go back">&larr;</a>
+          <h2>Topics</h2>
+        </div>
+        {% if user.is_authenticated and perms.forum.add_thread %}
+          <a href="{% url 'forum:thread_create' %}" class="mini-action" aria-label="Create thread">+</a>
+        {% endif %}
+      </div>
+      <ul class="stream-list">
+        {% for category in categories %}
+          <li class="stream-item">
+            <a href="{% url 'forum:chatroom' category_slug=category.slug %}" class="stream-link{% if active_category_slug == category.slug %} is-active{% endif %}">
+              <span class="stream-hash">#</span>
+              <span class="stream-label">{{ category.name }}</span>
+              <span class="stream-count">{{ category.thread_count }}</span>
+            </a>
+            {% if category.active_threads_24h %}
+              <ul class="stream-subthreads">
+                {% for hot_thread in category.active_threads_24h %}
+                  <li>
+                    <a href="{{ hot_thread.get_absolute_url }}" class="stream-subthread-link" title="{{ hot_thread.title }}">
+                      <span class="stream-subthread-main">
+                        {% if hot_thread.is_fresh %}<span class="stream-subthread-fresh" aria-hidden="true">&#9733;</span>{% endif %}
+                        <span class="stream-subthread-title">{{ hot_thread.title }}</span>
+                      </span>
+                      <span class="stream-subthread-meta">
+                        <span class="stream-subthread-count">{{ hot_thread.reply_count }}</span>
+                        {% if hot_thread.unread_mention_count %}<span class="mention-mini-badge">{{ hot_thread.unread_mention_count }}</span>{% endif %}
+                      </span>
+                    </a>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          </li>
+        {% empty %}
+          <li class="empty-copy">No topics yet.</li>
+        {% endfor %}
+      </ul>
+    </section>
+  </aside>
+
+  <section class="main-pane conversation-pane chatroom-pane">
+    <header class="toolbar conversation-toolbar chatroom-toolbar">
+      <div class="chatroom-toolbar-main">
+        <p class="eyebrow">Live Room</p>
+        <h1>#{{ category.name }}</h1>
+        <p class="toolbar-copy">{{ room.description }}</p>
+      </div>
+      <div class="chatroom-toolbar-actions">
+        <a href="{{ category_topics_url }}" class="button-like">All {{ category_topic_total }} topics</a>
+        {% if user.is_authenticated and perms.forum.add_thread %}
+          <a href="{% url 'forum:thread_create' %}?category={{ category.slug }}" class="button-like">New topic</a>
+        {% endif %}
+        <div class="toolbar-status">
+          <span class="badge">{{ chatroom_message_count }} posts</span>
+          <span class="badge">{{ chatroom_participant_total }} active</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="chatroom-topic-strip">
+      <div class="chatroom-topic-strip-head">
+        <div>
+          <p class="eyebrow">Latest Topics</p>
+          <h2>Forum context for #{{ category.name }}</h2>
+        </div>
+      </div>
+      <div class="chatroom-topic-list">
+        {% for topic in chatroom_pinned_topics %}
+          <article class="chatroom-topic-card">
+            <div class="chatroom-topic-card-main">
+              <a href="{{ topic.get_absolute_url }}" class="chatroom-topic-title">{{ topic.title }}</a>
+              <p class="chatroom-topic-meta">
+                <span>{{ topic.reply_count }} replies</span>
+                <span>{{ topic.updated_at|date:"M j, H:i" }}</span>
+                {% if topic.unread_mention_count %}<span class="mention-mini-badge">{{ topic.unread_mention_count }}</span>{% endif %}
+              </p>
+            </div>
+            <a href="{{ topic.get_absolute_url }}" class="button-like chatroom-topic-open">Open</a>
+          </article>
+        {% empty %}
+          <p class="empty-copy">No topics in this category yet.</p>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="chatroom-feed-shell">
+      <div class="chatroom-feed" id="chatroom-feed" data-chatroom-updates-url="{% url 'forum:chatroom_updates' category_slug=category.slug %}" data-last-message-id="{{ chatroom_last_message_id }}">
+        {% for message in chat_messages %}
+          {% include "forum/partials/chat_message.html" with message=message %}
+        {% empty %}
+          <div class="chatroom-empty-state">
+            <h2>The room is quiet</h2>
+            <p>Guests can read. Signed-up members can jump in with replies, quotes, images, and GIFs.</p>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    {% if user.is_authenticated and chat_can_post %}
+      <section class="composer-shell chatroom-composer-shell">
+        <div class="composer-header">
+          <div>
+            <p class="eyebrow">Chat</p>
+            <h2>Join #{{ category.name }}</h2>
+          </div>
+          <p class="muted">Every chat post adds 0.1 rep and counts toward Posts.</p>
+        </div>
+        <form method="post" action="{% url 'forum:chatroom_send' category_slug=category.slug %}" enctype="multipart/form-data" class="form-grid post-composer chatroom-composer" data-chatroom-form data-composer-root>
+          {% csrf_token %}
+          <input type="hidden" name="reply_to_id" value="" data-chat-reply-input>
+          <div class="reply-target is-hidden" data-chat-reply-target>
+            <span data-chat-reply-label></span>
+            <button type="button" class="composer-tool composer-tool-clear" data-chat-reply-clear>Clear</button>
+          </div>
+          {% include "components/markdown_toolbar.html" %}
+          <p>
+            {{ chat_form.body_markdown.label_tag }}
+            {{ chat_form.body_markdown }}
+          </p>
+          {{ chat_form.gif_url }}
+          <div class="mention-menu is-hidden" data-mention-menu role="listbox" aria-label="Mention suggestions"></div>
+          <div class="chat-gif-preview is-hidden" data-chat-gif-preview>
+            <img src="" alt="" data-chat-gif-preview-image>
+            <div class="chat-gif-preview-meta">
+              <span data-chat-gif-provider>KLIPY</span>
+              <button type="button" class="composer-tool composer-tool-clear" data-chat-gif-clear>Remove GIF</button>
+            </div>
+          </div>
+          <div class="composer-footer chatroom-composer-footer">
+            <div class="chatroom-composer-tools">
+              <label for="id_chat_attachments" class="button-like dm-file-trigger">Add Images</label>
+              <span class="dm-file-status" id="chatroom-file-status">PNG, JPG, GIF - up to 8 MB each</span>
+              <input id="id_chat_attachments" type="file" name="attachments" accept=".png,.jpg,.jpeg,.gif" multiple class="dm-file-input" data-file-count-target="chatroom-file-status">
+              {% if klipy_enabled %}
+                <button type="button" class="button-like chat-gif-trigger" data-chat-gif-open>GIF</button>
+              {% endif %}
+            </div>
+            <div class="composer-actions">
+              <p class="muted">Guests can read. Members can reply, quote, upload images, and share GIFs.</p>
+              <button type="submit">Send</button>
+            </div>
+          </div>
+          <div class="chat-composer-errors is-hidden" data-chatroom-errors></div>
+        </form>
+      </section>
+    {% else %}
+      <section class="composer-shell composer-shell-guest">
+        <p><a href="{% url 'accounts:register' %}">Sign up</a> to chat, reply, upload images, and share GIFs in real time.</p>
+      </section>
+    {% endif %}
+  </section>
+
+  <aside class="sidebar-pane inspector-pane">
+    <section class="sidebar-section">
+      <h3>Room Info</h3>
+      <dl class="meta-list">
+        <div><dt>Category</dt><dd>#{{ category.name }}</dd></div>
+        <div><dt>Posts</dt><dd>{{ chatroom_message_count }}</dd></div>
+        <div><dt>Members</dt><dd>{{ chatroom_participant_total }}</dd></div>
+        <div><dt>Topics</dt><dd>{{ category_topic_total }}</dd></div>
+      </dl>
+    </section>
+
+    <div id="chatroom-participants-root">
+      {% include "forum/partials/chat_participants.html" %}
+    </div>
+
+    {% include "components/sidebar_community.html" %}
+  </aside>
+</section>
+
+{% if klipy_enabled %}
+  <div class="chat-gif-modal hidden" data-chat-gif-modal data-klipy-app-key="{{ klipy_app_key }}" data-klipy-api-base="{{ klipy_api_base }}" data-klipy-content-filter="{{ klipy_content_filter }}" data-klipy-customer-id="{% if user.is_authenticated %}{{ user.username }}{% else %}guest-browser{% endif %}">
+    <div class="chat-gif-modal-card">
+      <div class="chat-gif-modal-head">
+        <div>
+          <p class="eyebrow">GIF Picker</p>
+          <h2>Search KLIPY</h2>
+        </div>
+        <button type="button" class="mini-action" data-chat-gif-close aria-label="Close GIF picker">&times;</button>
+      </div>
+      <div class="chat-gif-modal-search">
+        <input type="search" placeholder="Search KLIPY" autocomplete="off" data-chat-gif-query>
+      </div>
+      <div class="chat-gif-grid" data-chat-gif-grid></div>
+      <p class="chat-gif-attribution"><a href="{{ klipy_attribution_url }}" target="_blank" rel="noopener">Powered by KLIPY</a></p>
+    </div>
+  </div>
+{% endif %}
+
+<div id="user-card-overlay" class="user-card-overlay hidden"></div>
+{{ mentionable_users|json_script:"mentionable-users-data" }}
+{% endblock %}

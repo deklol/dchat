@@ -54,6 +54,9 @@ body.theme-dekcx .sidebar-pane,
 body.theme-dekcx .main-pane,
 body.theme-dekcx .forum-post,
 body.theme-dekcx .composer-shell,
+body.theme-dekcx .chatroom-feed-shell,
+body.theme-dekcx .chatroom-composer-shell,
+body.theme-dekcx .chat-gif-modal-card,
 body.theme-dekcx .form-shell,
 body.theme-dekcx .page-shell,
 body.theme-dekcx .profile-card,
@@ -136,6 +139,9 @@ body.theme-dekcx .top-nav button,
 body.theme-dekcx .mini-action,
 body.theme-dekcx .composer-tool,
 body.theme-dekcx .vote-btn,
+body.theme-dekcx .chat-action-btn,
+body.theme-dekcx .chat-gif-item,
+body.theme-dekcx .chat-reply-preview,
 body.theme-dekcx .forum-post-actions a,
 body.theme-dekcx .forum-post-actions button,
 body.theme-dekcx .inline-form button,
@@ -156,6 +162,9 @@ body.theme-dekcx .top-nav button:hover,
 body.theme-dekcx .mini-action:hover,
 body.theme-dekcx .composer-tool:hover,
 body.theme-dekcx .vote-btn:hover,
+body.theme-dekcx .chat-action-btn:hover,
+body.theme-dekcx .chat-gif-item:hover,
+body.theme-dekcx .chat-reply-preview:hover,
 body.theme-dekcx .forum-post-actions a:hover,
 body.theme-dekcx .forum-post-actions button:hover,
 body.theme-dekcx .inline-form button:hover,
@@ -221,9 +230,11 @@ body.theme-dekcx .outbound-link-card button[type="submit"]:hover {
 
 body.theme-dekcx .sidebar-section,
 body.theme-dekcx .toolbar,
+body.theme-dekcx .chatroom-topic-strip,
 body.theme-dekcx .topic-pane-head,
 body.theme-dekcx .message-feed-title,
 body.theme-dekcx .forum-post-author,
+body.theme-dekcx .chatroom-composer-shell,
 body.theme-dekcx .dm-rail-head,
 body.theme-dekcx .dm-pane-head {
   border-color: var(--dek-frame);
@@ -245,6 +256,11 @@ body.theme-dekcx .participant-item,
 body.theme-dekcx .dm-conversation-row,
 body.theme-dekcx .dm-activity-card,
 body.theme-dekcx .dm-message-row,
+body.theme-dekcx .chat-message-hover-btn,
+body.theme-dekcx .chatroom-topic-card,
+body.theme-dekcx .chat-message-room,
+body.theme-dekcx .chat-gif-preview,
+body.theme-dekcx .chat-composer-errors,
 body.theme-dekcx .reply-context,
 body.theme-dekcx .topic-tag,
 body.theme-dekcx .role-badge-member,
@@ -270,6 +286,29 @@ body.theme-dekcx .user-card-links span {
   border: 1px solid color-mix(in srgb, var(--link) 18%, rgba(255, 255, 255, 0.06));
 }
 
+body.theme-dekcx .chat-message-menu-panel {
+  border: 1px solid var(--dek-frame-strong);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface) 80%, #111a2c), color-mix(in srgb, var(--surface) 92%, #0a1220));
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.34);
+}
+
+body.theme-dekcx .chat-message-menu-item {
+  color: color-mix(in srgb, var(--text) 96%, white);
+}
+
+body.theme-dekcx .chat-message-menu-item:hover {
+  background: color-mix(in srgb, var(--link) 16%, rgba(255, 255, 255, 0.06));
+}
+
+body.theme-dekcx .chat-message-menu-item-danger {
+  color: #ffb8b5;
+}
+
+body.theme-dekcx .chat-message-menu-item-danger:hover {
+  background: rgba(126, 44, 40, 0.42);
+  color: #fff1ef;
+}
+
 body.theme-dekcx .sidebar-chip,
 body.theme-dekcx .sidebar-link-grid a {
   background: color-mix(in srgb, var(--surface) 86%, #111827);
@@ -288,6 +327,7 @@ body.theme-dekcx .stream-link.is-active,
 body.theme-dekcx .stream-subthread-link:hover,
 body.theme-dekcx .stream-subthread-link.is-active,
 body.theme-dekcx .topic-row:hover,
+body.theme-dekcx .chat-message-row:hover,
 body.theme-dekcx .participant-item:hover,
 body.theme-dekcx .mention-item:hover,
 body.theme-dekcx .mention-item.is-active,
@@ -355,6 +395,28 @@ body.theme-dekcx .dm-presence.is-online {
 body.theme-dekcx .attachment-preview img {
   border-color: var(--dek-frame-strong);
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.2);
+}
+
+body.theme-dekcx .chat-gif-embed img,
+body.theme-dekcx .chat-gif-preview img {
+  border-color: var(--dek-frame-strong);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
+}
+
+body.theme-dekcx .chat-gif-badge {
+  border: 1px solid var(--dek-frame-strong);
+  background: color-mix(in srgb, var(--surface) 84%, #111827);
+  color: var(--dek-accent-text);
+}
+
+body.theme-dekcx .chat-message-author,
+body.theme-dekcx .chatroom-topic-title,
+body.theme-dekcx .chat-reply-preview span:first-child {
+  color: color-mix(in srgb, var(--text) 98%, white);
+}
+
+body.theme-dekcx .stream-chat-icon {
+  color: var(--dek-accent-text);
 }
 
 body.theme-dekcx .user-card-links a,

@@ -1,7 +1,7 @@
 from django import forms
 from django.conf import settings
 
-ALLOWED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/gif"}
+from apps.core.uploads import validate_uploaded_image
 
 
 class MultipleImageInput(forms.ClearableFileInput):
@@ -47,10 +47,7 @@ class DirectMessageForm(forms.Form):
     def clean_attachments(self):
         files = self.cleaned_data.get("attachments") or []
         for file in files:
-            if file.content_type not in ALLOWED_IMAGE_TYPES:
-                raise forms.ValidationError("Only PNG, JPG/JPEG, and GIF files are allowed.")
-            if file.size > settings.MAX_UPLOAD_BYTES:
-                raise forms.ValidationError(f"Max upload size is {settings.MAX_UPLOAD_MB} MB.")
+            validate_uploaded_image(file, max_bytes=settings.MAX_UPLOAD_BYTES, max_mb=settings.MAX_UPLOAD_MB)
         return files
 
     def clean(self):
@@ -114,10 +111,7 @@ class StartDirectMessageForm(forms.Form):
     def clean_attachments(self):
         files = self.cleaned_data.get("attachments") or []
         for file in files:
-            if file.content_type not in ALLOWED_IMAGE_TYPES:
-                raise forms.ValidationError("Only PNG, JPG/JPEG, and GIF files are allowed.")
-            if file.size > settings.MAX_UPLOAD_BYTES:
-                raise forms.ValidationError(f"Max upload size is {settings.MAX_UPLOAD_MB} MB.")
+            validate_uploaded_image(file, max_bytes=settings.MAX_UPLOAD_BYTES, max_mb=settings.MAX_UPLOAD_MB)
         return files
 
     def clean(self):

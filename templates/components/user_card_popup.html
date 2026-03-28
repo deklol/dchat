@@ -34,6 +34,9 @@
     <div class="user-card-section">
       <h4>Forum Stats</h4>
       {% include "components/user_forum_stats.html" with stats_user=profile_user %}
+      <div class="user-card-links">
+        <a href="{{ chat_posts_url }}">Chatroom Posts{% if chat_post_count %} ({{ chat_post_count }}){% endif %}</a>
+      </div>
     </div>
     <div class="user-card-section">
       <h4>About Me</h4>

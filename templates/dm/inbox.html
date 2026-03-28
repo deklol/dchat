@@ -18,19 +18,34 @@
       </header>
 
       <section class="dm-launcher">
-        <div class="dm-section-head">
-          <h2>Start A DM</h2>
-          <p class="muted">Open a conversation without leaving the inbox.</p>
+        <div class="dm-section-head dm-section-head-stack">
+          <div>
+            <p class="eyebrow">Direct Messages</p>
+            <h2>New Conversation</h2>
+          </div>
+          <p class="muted">Start a DM here or from any user popup.</p>
         </div>
         <form method="post" action="{% url 'dm:start' %}" class="dm-launcher-form" enctype="multipart/form-data">
           {% csrf_token %}
-          <label for="id_dm_start_username">Username</label>
-          <input id="id_dm_start_username" type="text" name="username" maxlength="150" placeholder="@username" autocomplete="off" required>
-          <label for="id_dm_start_body">First message</label>
-          <input id="id_dm_start_body" type="text" name="body" maxlength="1000" placeholder="Write first message..." autocomplete="off">
-          <label for="id_dm_start_attachments">Images</label>
-          <input id="id_dm_start_attachments" type="file" name="attachments" accept=".png,.jpg,.jpeg,.gif" multiple>
-          <button type="submit">Send</button>
+          <div class="dm-launcher-topline">
+            <div class="dm-launcher-field dm-launcher-field-username">
+              <label for="id_dm_start_username" class="visually-hidden">Username</label>
+              <input id="id_dm_start_username" type="text" name="username" maxlength="150" placeholder="@username" autocomplete="off" required>
+            </div>
+            <button type="submit">Send</button>
+          </div>
+          <div class="dm-launcher-field">
+            <label for="id_dm_start_body" class="visually-hidden">First message</label>
+            <input id="id_dm_start_body" type="text" name="body" maxlength="1000" placeholder="Write first message or drop in images..." autocomplete="off">
+          </div>
+          <div class="dm-launcher-footline">
+            <div class="dm-file-row">
+              <label for="id_dm_start_attachments" class="button-like dm-file-trigger">Add Images</label>
+              <span class="dm-file-status" id="dm-start-file-status">PNG, JPG, GIF - up to 8 MB each</span>
+            </div>
+            <input id="id_dm_start_attachments" type="file" name="attachments" accept=".png,.jpg,.jpeg,.gif" multiple class="dm-file-input" data-file-count-target="dm-start-file-status">
+            <p class="muted">Text and image-only DM starts are both supported.</p>
+          </div>
         </form>
       </section>
 
@@ -41,26 +56,31 @@
         </div>
         <div class="dm-conversation-list">
           {% for conversation in conversations %}
-            <a href="{% url 'dm:inbox' %}?u={{ conversation.other_user.username }}" class="dm-conversation-row{% if conversation.is_selected %} is-active{% endif %}">
-              <span class="dm-conversation-avatar-wrap">
-                {% if conversation.other_user.avatar %}
-                  <img src="{{ conversation.other_user.avatar.url }}" alt="{{ conversation.other_user.username }}" class="dm-conversation-avatar" width="44" height="44">
-                {% else %}
-                  <span class="dm-conversation-avatar dm-conversation-avatar-fallback" aria-hidden="true">{{ conversation.other_user.username|slice:":1"|upper }}</span>
-                {% endif %}
-                <span class="dm-presence{% if conversation.other_user_is_online %} is-online{% endif %}"></span>
-              </span>
-              <span class="dm-conversation-main">
-                <span class="dm-conversation-topline">
-                  <strong>{{ conversation.other_user.username }}</strong>
-                  <span>{{ conversation.last_message.created_at|date:"M j, H:i"|default:"New" }}</span>
+            <article class="dm-conversation-row{% if conversation.is_selected %} is-active{% endif %}" data-dm-conversation-key="{{ conversation.other_user.username }}">
+              <a href="{% url 'dm:inbox' %}?u={{ conversation.other_user.username }}" class="dm-conversation-link">
+                <span class="dm-conversation-avatar-wrap">
+                  {% if conversation.other_user.avatar %}
+                    <img src="{{ conversation.other_user.avatar.url }}" alt="{{ conversation.other_user.username }}" class="dm-conversation-avatar" width="44" height="44">
+                  {% else %}
+                    <span class="dm-conversation-avatar dm-conversation-avatar-fallback" aria-hidden="true">{{ conversation.other_user.username|slice:":1"|upper }}</span>
+                  {% endif %}
+                  <span class="dm-presence{% if conversation.other_user_is_online %} is-online{% endif %}"></span>
                 </span>
-                <span class="dm-conversation-preview">{{ conversation.last_preview }}</span>
-              </span>
-              {% if conversation.unread_count %}
-                <span class="mention-thread-badge">{{ conversation.unread_count }}</span>
-              {% endif %}
-            </a>
+                <span class="dm-conversation-main">
+                  <span class="dm-conversation-topline">
+                    <strong>{{ conversation.other_user.username }}</strong>
+                    <span>{{ conversation.last_message.created_at|date:"M j, H:i"|default:"New" }}</span>
+                  </span>
+                  <span class="dm-conversation-preview">{{ conversation.last_preview }}</span>
+                </span>
+              </a>
+              <div class="dm-conversation-tools">
+                {% if conversation.unread_count %}
+                  <span class="mention-thread-badge">{{ conversation.unread_count }}</span>
+                {% endif %}
+                <button type="button" class="dm-conversation-hide" data-hide-guild-dm="{{ conversation.other_user.username }}">Hide</button>
+              </div>
+            </article>
           {% empty %}
             <p class="empty-copy">No direct conversations yet. Start one above or from a user popup.</p>
           {% endfor %}
@@ -153,8 +173,12 @@
               {% csrf_token %}
               <label for="{{ form.body.id_for_label }}" class="visually-hidden">Direct message body</label>
               {{ form.body }}
-              <label for="{{ form.attachments.id_for_label }}" class="visually-hidden">Direct message images</label>
-              {{ form.attachments }}
+              <div class="dm-compose-attachments">
+                <label for="id_dm_compose_attachments" class="button-like dm-file-trigger">Add Images</label>
+                <span class="dm-file-status" id="dm-compose-file-status">PNG, JPG, GIF - up to 8 MB each</span>
+                <input id="id_dm_compose_attachments" type="file" name="attachments" accept=".png,.jpg,.jpeg,.gif" multiple class="dm-file-input" data-file-count-target="dm-compose-file-status">
+              </div>
+              {{ form.attachments.errors }}
               <div class="dm-compose-actions">
                 <p class="muted">Encrypted at rest, delivered over HTTPS.</p>
                 <button type="submit">Send DM</button>

@@ -1,0 +1,65 @@
+<div class="chat-message-hover-tools">
+  {% if user.is_authenticated and not message.is_deleted %}
+    <button type="button" class="chat-message-hover-btn" data-chat-quote-to="{{ message.id }}" data-chat-quote-name="{{ message.author.username }}" title="Quick quote reply" aria-label="Quick quote reply">
+      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+        <path d="M15.25 4.75h-5.5a5 5 0 0 0-5 5v1.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M7.75 8 4.75 11l3 3" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+  {% endif %}
+  <details class="chat-message-menu">
+    <summary class="chat-message-hover-btn chat-message-menu-toggle" aria-label="More message actions">
+      <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+        <circle cx="4" cy="10" r="1.5"/>
+        <circle cx="10" cy="10" r="1.5"/>
+        <circle cx="16" cy="10" r="1.5"/>
+      </svg>
+    </summary>
+    <div class="chat-message-menu-panel">
+      {% if user.is_authenticated and not message.is_deleted %}
+        <button type="button" class="chat-message-menu-item" data-chat-reply-to="{{ message.id }}" data-chat-reply-name="{{ message.author.username }}">Reply</button>
+        <button type="button" class="chat-message-menu-item" data-chat-quote-to="{{ message.id }}" data-chat-quote-name="{{ message.author.username }}">Quote</button>
+      {% endif %}
+      {% if message.can_report and not message.is_deleted %}
+        <form method="post" action="{% url 'forum:report' %}" class="chat-message-menu-form">
+          {% csrf_token %}
+          <input type="hidden" name="target_type" value="chat_message">
+          <input type="hidden" name="target_id" value="{{ message.id }}">
+          <input type="hidden" name="reason" value="chatroom-content">
+          <input type="hidden" name="next" value="{{ message.get_absolute_url }}">
+          <button type="submit" class="chat-message-menu-item">Report</button>
+        </form>
+      {% endif %}
+      {% if message.can_warn_author and not message.is_deleted %}
+        <form method="post" action="{% url 'forum:warn_user' %}" class="chat-message-menu-form">
+          {% csrf_token %}
+          <input type="hidden" name="target_type" value="chat_message">
+          <input type="hidden" name="target_id" value="{{ message.id }}">
+          <input type="hidden" name="note" value="chatroom warning">
+          <input type="hidden" name="next" value="{{ message.get_absolute_url }}">
+          <button type="submit" class="chat-message-menu-item chat-message-menu-item-danger" onclick="return confirm('Warn this user and deduct 1 rep?');">Warn</button>
+        </form>
+      {% endif %}
+      {% if message.can_soft_delete %}
+        {% if not message.is_deleted %}
+          <form method="post" action="{% url 'forum:soft_delete' %}" class="chat-message-menu-form">
+            {% csrf_token %}
+            <input type="hidden" name="target_type" value="chat_message">
+            <input type="hidden" name="target_id" value="{{ message.id }}">
+            <input type="hidden" name="note" value="chatroom moderation">
+            <input type="hidden" name="next" value="{{ message.get_absolute_url }}">
+            <button type="submit" class="chat-message-menu-item chat-message-menu-item-danger">Delete</button>
+          </form>
+        {% else %}
+          <form method="post" action="{% url 'forum:restore' %}" class="chat-message-menu-form">
+            {% csrf_token %}
+            <input type="hidden" name="target_type" value="chat_message">
+            <input type="hidden" name="target_id" value="{{ message.id }}">
+            <input type="hidden" name="next" value="{{ message.get_absolute_url }}">
+            <button type="submit" class="chat-message-menu-item">Restore</button>
+          </form>
+        {% endif %}
+      {% endif %}
+    </div>
+  </details>
+</div>

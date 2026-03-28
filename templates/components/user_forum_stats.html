@@ -10,7 +10,7 @@
   <div class="user-forum-stat">
     <span>Rep</span>
     <strong class="user-forum-stat-value{% if stats_user.forum_rep > 0 %} is-positive{% elif stats_user.forum_rep < 0 %} is-negative{% endif %}">
-      {% if stats_user.forum_rep > 0 %}+{% endif %}{{ stats_user.forum_rep|default:0 }}
+      {% if stats_user.forum_rep > 0 %}+{% endif %}{{ stats_user.forum_rep|default:0|floatformat:"-1" }}
     </strong>
   </div>
 </div>

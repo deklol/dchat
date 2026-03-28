@@ -1,5 +1,6 @@
 from django.urls import path
 
+from apps.forum.chat_views import chatroom_root, chatroom_send, chatroom_updates, chatroom_view, user_chat_messages
 from apps.forum.views import (
     HomeView,
     ModerationQueueView,
@@ -25,6 +26,11 @@ app_name = "forum"
 
 urlpatterns = [
     path("", HomeView.as_view(), name="home"),
+    path("chat/", chatroom_root, name="chatroom_root"),
+    path("chat/<slug:category_slug>/", chatroom_view, name="chatroom"),
+    path("chat/<slug:category_slug>/send/", chatroom_send, name="chatroom_send"),
+    path("chat/<slug:category_slug>/updates/", chatroom_updates, name="chatroom_updates"),
+    path("chat/users/<slug:username>/", user_chat_messages, name="user_chat_messages"),
     path("threads/new/", thread_create, name="thread_create"),
     path("thread/<slug:category_slug>/<slug:thread_slug>-<int:thread_id>/", ThreadDetailView.as_view(), name="thread_detail"),
     path("threads/<int:thread_id>/", thread_legacy_redirect, name="thread_detail_legacy"),

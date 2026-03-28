@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.3
+- Added category-based live chatrooms with their own message feeds, participant rails, and the latest three related topics pinned at the top.
+- Reworked chat message continuity so consecutive messages chain cleanly and only reset identity after a long gap or a speaker change.
+- Moved chat message actions into a compact far-right hover affordance that no longer creates extra spacing between messages.
+- Added Django admin controls for KLIPY integration through Site Branding, so operators can enable GIF search without editing env files.
+- Removed the redundant top-nav Chatroom link and tightened the public README for a cleaner GitHub-facing release.
+
 ## v1.2
 - Added lightweight live inbox badge updates so new DMs and inbox notifications appear without a full page refresh.
 - Invalidated unread-count caches on DM send, DM read, mention read, and notification read for consistent header state.
@@ -9,7 +16,7 @@
 - Brought DMs closer to thread capability parity with markdown/link embeds and multiple image uploads up to the normal 8 MB per-file limit.
 
 ## v1.1
-- Replaced vote-derived “rep” with a real reputation system backed by explicit `+Rep` grants and moderator warning penalties.
+- Replaced vote-derived "rep" with a real reputation system backed by explicit `+Rep` grants and moderator warning penalties.
 - Added `+Rep` actions to thread starters and replies, with one grant per user per piece of content.
 - Added moderator `Warn` actions that deduct rep and notify the warned user.
 - Expanded the user popup card and profile page with live forum stats plus recent topics and replies.
@@ -18,10 +25,10 @@
 ## v1.0
 - Added direct post permalinks: clicking a post timestamp now targets that exact post and copies its deep link.
 - Added thread-level mention state in topic lists with unread mention badges/highlighting that clear when the thread is viewed.
-- Added image-based thread creation (optional upload on thread composer) rendered in the thread starter area for comment-driven image topics.
+- Added image-based thread creation rendered in the thread starter area for comment-driven image topics.
 - Added nested left-sidebar subthreads showing active threads from the last 24 hours, including unread mention badges.
-- Added encrypted Direct Messages with user-to-user conversations, report controls, and staff review access limited to reported DMs.
-- Added DM action + online/offline status indicator to the user popup card.
+- Added encrypted direct messages with user-to-user conversations, report controls, and staff review access limited to reported DMs.
+- Added DM action and online/offline status indicator to the user popup card.
 - Fixed reply-card stat counters resetting to zero after live fragment refreshes.
 
 ## v0.9
@@ -56,7 +63,7 @@
 
 ## v0.4
 - Reworked default UI to a Discord-first shell with Zulip-inspired information density.
-- Added a proper app frame (guild rail, stream/channel sidebar, focused message pane, compact top bar).
+- Added a proper app frame with guild rail, stream sidebar, focused message pane, and compact top bar.
 - Redesigned thread and reply presentation for a closer Discord-style conversation flow.
 - Upgraded user popup card styling and profile sections for faster identity scanning.
 

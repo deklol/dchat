@@ -1,0 +1,71 @@
+{% load forum_format %}
+<article class="chat-message-row{% if message.is_deleted %} is-deleted{% endif %}{% if message.is_continuation %} is-continuation{% endif %}{% if message.has_actions %} has-hover-tools{% endif %}" id="chat-message-{{ message.id }}" data-chat-message-id="{{ message.id }}">
+  <div class="chat-message-avatar-column">
+    {% if message.show_identity %}
+      {% if message.author.avatar %}
+        <img src="{{ message.author.avatar.url }}" alt="{{ message.author.username }}" class="chat-message-avatar" width="44" height="44">
+      {% else %}
+        <span class="chat-message-avatar chat-message-avatar-fallback" aria-hidden="true">{{ message.author.username|slice:":1"|upper }}</span>
+      {% endif %}
+    {% else %}
+      <span class="chat-message-avatar-spacer" aria-hidden="true"></span>
+    {% endif %}
+  </div>
+  <div class="chat-message-main">
+    {% if message.show_identity %}
+      <div class="chat-message-meta">
+        <a href="{% url 'accounts:profile' username=message.author.username %}" class="chat-message-author" data-user-card="{{ message.author.username }}">{{ message.author.username }}</a>
+        {% include "components/user_role_badge.html" with role_user=message.author %}
+        {% if message.room_label %}<span class="chat-message-room">{{ message.room_label }}</span>{% endif %}
+        <a href="#chat-message-{{ message.id }}" class="chat-message-time" data-post-link="#chat-message-{{ message.id }}" title="Copy direct link">
+          {{ message.created_at|date:"M j, Y H:i" }}
+        </a>
+      </div>
+    {% endif %}
+
+    {% if message.reply_to_id and message.reply_to %}
+      <button type="button" class="chat-reply-preview" data-chat-jump="{{ message.reply_to.id }}">
+        <span>@{{ message.reply_to.author.username }}</span>
+        <span>{{ message.reply_preview }}</span>
+      </button>
+    {% endif %}
+
+    <div class="chat-message-bubble{% if message.has_actions %} has-message-tools{% endif %}">
+      {% if message.has_actions %}
+        <div class="chat-message-inline-tools chat-message-inline-tools-bubble">
+          {% include "forum/partials/chat_message_actions.html" with message=message %}
+        </div>
+      {% endif %}
+      {% if message.is_deleted %}
+        <p class="muted">Message removed by moderation.</p>
+      {% else %}
+        {% if message.body_markdown %}
+          <div class="chat-message-body markdown-body">{{ message.body_markdown|render_markdown }}</div>
+        {% endif %}
+        {% if message.gif_url %}
+          <figure class="chat-gif-embed">
+            <img src="{{ message.gif_url }}" alt="GIF shared by {{ message.author.username }}" loading="lazy">
+            {% if message.is_klipy_gif %}
+              <figcaption class="chat-gif-badge">KLIPY</figcaption>
+            {% endif %}
+          </figure>
+        {% endif %}
+        {% if message.attachments_cache %}
+          <div class="attachment-preview-list">
+            {% for attachment in message.attachments_cache %}
+              <figure class="attachment-preview">
+                <a href="{{ attachment.file.url }}" target="_blank" rel="noopener">
+                  <img src="{{ attachment.file.url }}" alt="{{ attachment.original_name }}" loading="lazy">
+                </a>
+                <figcaption>
+                  <a href="{{ attachment.file.url }}" target="_blank" rel="noopener">{{ attachment.original_name }}</a>
+                </figcaption>
+              </figure>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endif %}
+    </div>
+
+  </div>
+</article>

@@ -1,8 +1,12 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
-from apps.forum.models import Category, ModerationWarning, Post, Report, ReputationGrant, Thread, extract_mentions
+from apps.forum.chat_views import annotate_chat_messages
+from apps.forum.models import Category, ChatMessage, ChatRoom, ModerationWarning, Post, Report, ReputationGrant, Thread, extract_mentions
 from apps.forum.stats import build_user_forum_stats
 from apps.forum.templatetags.forum_format import link_mentions
 
@@ -151,3 +155,21 @@ class ForumFlowTests(TestCase):
         self.assertTrue(ModerationWarning.objects.filter(user=bob, post=post).exists())
         stats = build_user_forum_stats([bob.id])
         self.assertEqual(stats[bob.id]["rep"], 0)
+
+    def test_chat_messages_only_reset_identity_after_twelve_hours(self):
+        room = ChatRoom.for_category(self.category)
+        first = ChatMessage.objects.create(room=room, author=self.user, body_markdown="first")
+        second = ChatMessage.objects.create(room=room, author=self.user, body_markdown="second")
+        third = ChatMessage.objects.create(room=room, author=self.user, body_markdown="third")
+
+        base_time = timezone.now()
+        ChatMessage.objects.filter(id=first.id).update(created_at=base_time)
+        ChatMessage.objects.filter(id=second.id).update(created_at=base_time + timedelta(hours=1))
+        ChatMessage.objects.filter(id=third.id).update(created_at=base_time + timedelta(hours=13, minutes=1))
+
+        messages = list(ChatMessage.objects.filter(room=room).order_by("created_at"))
+        annotate_chat_messages(messages, self.user)
+
+        self.assertTrue(messages[0].show_identity)
+        self.assertFalse(messages[1].show_identity)
+        self.assertTrue(messages[2].show_identity)

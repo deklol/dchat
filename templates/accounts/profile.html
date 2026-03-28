@@ -20,6 +20,9 @@
       <section class="profile-panel">
         <h2>Forum Stats</h2>
         {% include "components/user_forum_stats.html" with stats_user=profile_user %}
+        <div class="profile-panel-actions">
+          <a href="{{ chat_posts_url }}" class="button-like">View Chatroom Posts{% if chat_post_count %} ({{ chat_post_count }}){% endif %}</a>
+        </div>
       </section>
 
       <section class="profile-panel">
@@ -72,6 +75,7 @@
       <div class="profile-actions">
         <a href="{% url 'accounts:profile_edit' %}">Edit Profile</a>
         <a href="{% url 'dm:settings' %}">Inbox Settings</a>
+        <a href="{{ chat_posts_url }}">Chatroom Posts</a>
         <a href="{% url 'accounts:privacy_export' %}">Export My Data</a>
         <a href="{% url 'accounts:privacy_delete' %}">Delete Account</a>
       </div>

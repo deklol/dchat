@@ -3,6 +3,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 
+from apps.core.uploads import validate_uploaded_image
 from apps.accounts.utils import captcha_failure_message, get_math_captcha_question, verify_math_captcha
 
 User = get_user_model()
@@ -90,6 +91,12 @@ class ProfileForm(forms.ModelForm):
         self.fields["website_url"].widget.attrs.update({"placeholder": "https://example.com", "autocomplete": "url"})
         self.fields["social_x"].widget.attrs.update({"placeholder": "https://x.com/yourname", "autocomplete": "url"})
         self.fields["social_discord"].widget.attrs.update({"placeholder": "username#0000", "spellcheck": "false"})
+
+    def clean_avatar(self):
+        avatar = self.cleaned_data.get("avatar")
+        if not avatar:
+            return avatar
+        return validate_uploaded_image(avatar, max_bytes=settings.MAX_UPLOAD_BYTES, max_mb=settings.MAX_UPLOAD_MB)
 
 
 class DeleteAccountForm(forms.Form):

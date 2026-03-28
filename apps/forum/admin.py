@@ -3,6 +3,9 @@ from django.contrib import admin
 from .models import (
     Attachment,
     Category,
+    ChatAttachment,
+    ChatMessage,
+    ChatRoom,
     Mention,
     ModerationLog,
     ModerationWarning,
@@ -26,6 +29,24 @@ class CategoryAdmin(admin.ModelAdmin):
 class TagAdmin(admin.ModelAdmin):
     list_display = ("name", "slug")
     search_fields = ("name", "slug")
+
+
+@admin.register(ChatRoom)
+class ChatRoomAdmin(admin.ModelAdmin):
+    list_display = ("name", "slug", "is_public", "updated_at")
+    search_fields = ("name", "slug", "description")
+
+
+@admin.register(ChatMessage)
+class ChatMessageAdmin(admin.ModelAdmin):
+    list_display = ("id", "room", "author", "reply_to", "is_deleted", "created_at", "edited_at")
+    list_filter = ("room", "is_deleted")
+    search_fields = ("body_markdown", "author__username", "giphy_url")
+
+
+@admin.register(ChatAttachment)
+class ChatAttachmentAdmin(admin.ModelAdmin):
+    list_display = ("id", "message", "original_name", "mime_type", "size_bytes", "uploaded_at")
 
 
 @admin.register(Thread)

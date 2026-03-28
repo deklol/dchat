@@ -1,10 +1,34 @@
+from urllib.parse import urlparse
+
 from django import forms
 from django.conf import settings
 from django.utils.text import slugify
 
-from apps.forum.models import Post, Tag, Thread
+from apps.core.uploads import validate_uploaded_image
+from apps.forum.models import ChatMessage, Post, Tag, Thread
 
-ALLOWED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/gif"}
+
+def is_allowed_klipy_host(value: str) -> bool:
+    parsed = urlparse(value)
+    hostname = (parsed.hostname or "").lower()
+    if parsed.scheme not in {"http", "https"} or not hostname:
+        return False
+    return hostname == "klipy.com" or hostname.endswith(".klipy.com")
+
+
+class MultipleImageInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+
+class MultipleImageField(forms.FileField):
+    widget = MultipleImageInput
+
+    def clean(self, data, initial=None):
+        if not data:
+            return []
+        if not isinstance(data, (list, tuple)):
+            data = [data]
+        return list(data)
 
 
 class ThreadForm(forms.ModelForm):
@@ -42,11 +66,7 @@ class ThreadForm(forms.ModelForm):
         file = self.cleaned_data.get("attachment")
         if not file:
             return file
-        if file.content_type not in ALLOWED_IMAGE_TYPES:
-            raise forms.ValidationError("Only PNG, JPG/JPEG, and GIF files are allowed.")
-        if file.size > settings.MAX_UPLOAD_BYTES:
-            raise forms.ValidationError(f"Max upload size is {settings.MAX_UPLOAD_MB} MB.")
-        return file
+        return validate_uploaded_image(file, max_bytes=settings.MAX_UPLOAD_BYTES, max_mb=settings.MAX_UPLOAD_MB)
 
     def save(self, commit=True):
         thread = super().save(commit=commit)
@@ -85,8 +105,59 @@ class PostForm(forms.ModelForm):
         file = self.cleaned_data.get("attachment")
         if not file:
             return file
-        if file.content_type not in ALLOWED_IMAGE_TYPES:
-            raise forms.ValidationError("Only PNG, JPG/JPEG, and GIF files are allowed.")
-        if file.size > settings.MAX_UPLOAD_BYTES:
-            raise forms.ValidationError(f"Max upload size is {settings.MAX_UPLOAD_MB} MB.")
-        return file
+        return validate_uploaded_image(file, max_bytes=settings.MAX_UPLOAD_BYTES, max_mb=settings.MAX_UPLOAD_MB)
+
+
+class ChatMessageForm(forms.ModelForm):
+    attachments = MultipleImageField(
+        required=False,
+        widget=MultipleImageInput(
+            attrs={
+                "accept": ".png,.jpg,.jpeg,.gif",
+                "multiple": True,
+            }
+        ),
+    )
+
+    class Meta:
+        model = ChatMessage
+        fields = ("body_markdown", "gif_url")
+        widgets = {
+            "gif_url": forms.HiddenInput(),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["body_markdown"].required = False
+        self.fields["body_markdown"].label = "Message"
+        self.fields["body_markdown"].widget.attrs.update(
+            {
+                "placeholder": "Message the room. Markdown, @mentions, quotes, images, and embeds work here...",
+                "rows": 5,
+                "data-markdown-input": "true",
+            }
+        )
+
+    def clean_gif_url(self):
+        value = (self.cleaned_data.get("gif_url") or "").strip()
+        if not value:
+            return ""
+        if not is_allowed_klipy_host(value):
+            raise forms.ValidationError("Invalid GIF selection.")
+        return value
+
+    def clean_attachments(self):
+        files = self.cleaned_data.get("attachments") or []
+        for file in files:
+            validate_uploaded_image(file, max_bytes=settings.MAX_UPLOAD_BYTES, max_mb=settings.MAX_UPLOAD_MB)
+        return files
+
+    def clean(self):
+        cleaned_data = super().clean()
+        body = (cleaned_data.get("body_markdown") or "").strip()
+        attachments = cleaned_data.get("attachments") or []
+        gif_url = cleaned_data.get("gif_url") or ""
+        if not body and not attachments and not gif_url:
+            raise forms.ValidationError("Message cannot be empty.")
+        cleaned_data["body_markdown"] = body
+        return cleaned_data

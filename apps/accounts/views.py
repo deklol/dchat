@@ -23,7 +23,7 @@ from apps.core.models import LegalDocument, UserLegalConsent
 from apps.core.ratelimit import rate_limit
 from apps.dm.context_processors import get_dm_context_payload
 from apps.dm.models import DirectMessagePreference
-from apps.forum.models import ModerationWarning, Notification, Post, ReputationGrant, Thread
+from apps.forum.models import ChatMessage, ModerationWarning, Notification, Post, ReputationGrant, Thread
 from apps.forum.stats import apply_user_forum_stats, build_user_forum_stats
 
 User = get_user_model()
@@ -102,6 +102,8 @@ class ProfileDetailView(DetailView):
             post.permalink_url = f"{post.thread.get_absolute_url()}#post-{post.id}"
         context["recent_threads"] = recent_threads
         context["recent_posts"] = recent_posts
+        context["chat_post_count"] = ChatMessage.objects.filter(author=profile_user, is_deleted=False).count()
+        context["chat_posts_url"] = reverse("forum:user_chat_messages", kwargs={"username": profile_user.username})
         return context
 
 
@@ -149,6 +151,7 @@ def user_card_partial(request: HttpRequest, username: str) -> HttpResponse:
     )
     for post in recent_posts:
         post.permalink_url = f"{post.thread.get_absolute_url()}#post-{post.id}"
+    chat_post_count = ChatMessage.objects.filter(author=profile_user, is_deleted=False).count()
     return render(
         request,
         "components/user_card_popup.html",
@@ -159,6 +162,8 @@ def user_card_partial(request: HttpRequest, username: str) -> HttpResponse:
             "popup_next_url": popup_next_url,
             "recent_threads": recent_threads,
             "recent_posts": recent_posts,
+            "chat_post_count": chat_post_count,
+            "chat_posts_url": reverse("forum:user_chat_messages", kwargs={"username": profile_user.username}),
         },
     )
 
@@ -258,14 +263,17 @@ def export_personal_data(request: HttpRequest) -> HttpResponse:
         ),
         "posts": list(Post.objects.filter(author=user).values("id", "thread_id", "body_markdown", "created_at", "edited_at")),
         "notifications": list(
-            user.notifications.values("id", "kind", "body", "is_read", "created_at", "thread_id", "post_id")
+            user.notifications.values("id", "kind", "body", "is_read", "created_at", "thread_id", "post_id", "chat_room_id", "chat_message_id")
+        ),
+        "chat_messages": list(
+            ChatMessage.objects.filter(author=user).values("id", "room_id", "reply_to_id", "body_markdown", "gif_url", "created_at")
         ),
         "reputation_received": list(
             ReputationGrant.objects.filter(recipient=user).values("id", "actor_id", "thread_id", "post_id", "created_at")
         ),
         "warnings_received": list(
             ModerationWarning.objects.filter(user=user).values(
-                "id", "moderator_id", "thread_id", "post_id", "reason", "rep_penalty", "created_at"
+                "id", "moderator_id", "thread_id", "post_id", "chat_message_id", "reason", "rep_penalty", "created_at"
             )
         ),
     }
@@ -301,6 +309,13 @@ class DeleteAccountView(LoginRequiredMixin, FormView):
                 deleted_at=now,
                 deletion_reason="user_requested",
                 body_markdown="[deleted by user request]",
+            )
+            ChatMessage.objects.filter(author=user, is_deleted=False).update(
+                is_deleted=True,
+                deleted_at=now,
+                deletion_reason="user_requested",
+                body_markdown="[deleted by user request]",
+                gif_url="",
             )
 
         timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")

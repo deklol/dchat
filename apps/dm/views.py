@@ -52,18 +52,14 @@ def _send_dm(conversation: DirectConversation, sender, recipient, body: str, att
     )
     message.set_body(body)
     message.save()
-    DirectMessageAttachment.objects.bulk_create(
-        [
-            DirectMessageAttachment(
-                message=message,
-                file=file,
-                original_name=file.name,
-                mime_type=file.content_type or "",
-                size_bytes=file.size,
-            )
-            for file in (attachments or [])
-        ]
-    )
+    for file in attachments or []:
+        DirectMessageAttachment.objects.create(
+            message=message,
+            file=file,
+            original_name=file.name,
+            mime_type=file.content_type or "",
+            size_bytes=file.size,
+        )
     conversation.save(update_fields=["updated_at"])
     invalidate_dm_context(sender.id, recipient.id)
 
@@ -121,13 +117,18 @@ def dm_inbox(request: HttpRequest) -> HttpResponse:
             conversation.last_preview = "No messages yet."
 
     activity_notifications = list(
-        request.user.notifications.select_related("actor", "thread", "post", "actor__presence").order_by("-created_at")[:50]
+        request.user.notifications.select_related("actor", "thread", "post", "chat_room", "chat_message", "actor__presence").order_by("-created_at")[:50]
     )
     for notification in activity_notifications:
         if notification.thread:
             destination_url = notification.thread.get_absolute_url()
             if notification.post_id:
                 destination_url = f"{destination_url}#post-{notification.post_id}"
+            notification.destination_url = destination_url
+        elif notification.chat_room:
+            destination_url = notification.chat_room.get_absolute_url()
+            if notification.chat_message_id:
+                destination_url = f"{destination_url}#chat-message-{notification.chat_message_id}"
             notification.destination_url = destination_url
         else:
             notification.destination_url = ""

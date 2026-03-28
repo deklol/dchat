@@ -8,6 +8,9 @@ let mentionLookupTimer = null;
 let mentionAbortController = null;
 let threadReconnectTimer = null;
 let presenceReconnectTimer = null;
+let chatroomPollingTimer = null;
+let chatroomRequestInFlight = false;
+let chatGifSearchTimer = null;
 let cachedMentionUsers = null;
 const guildDmHiddenStorageKey = "dchat.hiddenGuildDmUsers";
 
@@ -241,6 +244,304 @@ function clearReplyTarget() {
   if (target) target.classList.add("is-hidden");
 }
 
+function chatroomFeedRoot() {
+  return document.getElementById("chatroom-feed");
+}
+
+function chatroomComposer() {
+  return document.querySelector("[data-chatroom-form]");
+}
+
+function clearChatReplyTarget() {
+  const composer = chatroomComposer();
+  if (!composer) return;
+  const input = composer.querySelector("[data-chat-reply-input]");
+  const target = composer.querySelector("[data-chat-reply-target]");
+  const label = composer.querySelector("[data-chat-reply-label]");
+  if (input) input.value = "";
+  if (label) label.textContent = "";
+  if (target) target.classList.add("is-hidden");
+}
+
+function setChatReplyTarget(messageId, username) {
+  const composer = chatroomComposer();
+  if (!composer) return;
+  const input = composer.querySelector("[data-chat-reply-input]");
+  const target = composer.querySelector("[data-chat-reply-target]");
+  const label = composer.querySelector("[data-chat-reply-label]");
+  const textarea = composer.querySelector("[data-markdown-input]");
+  if (input) input.value = messageId;
+  if (label) label.textContent = `Replying to @${username}`;
+  if (target) target.classList.remove("is-hidden");
+  if (textarea instanceof HTMLTextAreaElement) textarea.focus();
+}
+
+function insertChatQuote(messageId, username, sourceMessage) {
+  const composer = chatroomComposer();
+  if (!composer) return;
+  const textarea = composer.querySelector("[data-markdown-input]");
+  const body = sourceMessage.querySelector(".chat-message-body");
+  if (!(textarea instanceof HTMLTextAreaElement) || !(body instanceof HTMLElement)) return;
+  setChatReplyTarget(messageId, username);
+  const plainText = body.innerText.replace(/\n{3,}/g, "\n\n").trim();
+  if (!plainText) return;
+  const quoted = plainText
+    .split("\n")
+    .map((line) => `> ${line}`)
+    .join("\n");
+  const block = `> @${username} wrote:\n${quoted}\n\n`;
+  const prefix = textarea.value.trim() ? "\n" : "";
+  textarea.value = `${textarea.value}${prefix}${block}`;
+  const caret = textarea.value.length;
+  textarea.focus();
+  textarea.setSelectionRange(caret, caret);
+  textarea.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function chatroomIsNearBottom(feed) {
+  return feed.scrollHeight - feed.scrollTop - feed.clientHeight < 180;
+}
+
+function chatroomErrorsRoot() {
+  return document.querySelector("[data-chatroom-errors]");
+}
+
+function showChatroomErrors(errorMap) {
+  const root = chatroomErrorsRoot();
+  if (!root) return;
+  const values = Object.values(errorMap || {}).flat().filter(Boolean);
+  if (!values.length) {
+    root.classList.add("is-hidden");
+    root.innerHTML = "";
+    return;
+  }
+  root.replaceChildren(
+    ...values.map((value) => {
+      const line = document.createElement("p");
+      line.textContent = value;
+      return line;
+    }),
+  );
+  root.classList.remove("is-hidden");
+}
+
+function chatGifPreviewRoot() {
+  return document.querySelector("[data-chat-gif-preview]");
+}
+
+function clearChatGifSelection() {
+  const composer = chatroomComposer();
+  const preview = chatGifPreviewRoot();
+  const image = preview?.querySelector("[data-chat-gif-preview-image]") || null;
+  const input = composer?.querySelector("input[name='gif_url']") || null;
+  if (input instanceof HTMLInputElement) input.value = "";
+  if (image instanceof HTMLImageElement) {
+    image.src = "";
+    image.alt = "";
+  }
+  if (preview) preview.classList.add("is-hidden");
+}
+
+function setChatGifSelection(url, title) {
+  const composer = chatroomComposer();
+  const preview = chatGifPreviewRoot();
+  const image = preview?.querySelector("[data-chat-gif-preview-image]") || null;
+  const input = composer?.querySelector("input[name='gif_url']") || null;
+  if (!(input instanceof HTMLInputElement) || !(image instanceof HTMLImageElement) || !preview) return;
+  if (!isAllowedKlipyUrl(url)) return;
+  input.value = url;
+  image.src = url;
+  image.alt = title || "Selected GIF";
+  preview.classList.remove("is-hidden");
+}
+
+function appendChatroomMessageHtml(html) {
+  const feed = chatroomFeedRoot();
+  if (!feed || !html) return null;
+  const template = document.createElement("template");
+  template.innerHTML = html.trim();
+  const node = template.content.firstElementChild;
+  if (!node) return null;
+  feed.appendChild(node);
+  hydrateEmbeds(node);
+  return node;
+}
+
+function updateChatroomParticipants(html) {
+  const root = document.getElementById("chatroom-participants-root");
+  if (root && html) root.innerHTML = html;
+}
+
+async function refreshChatroomUpdates() {
+  const feed = chatroomFeedRoot();
+  if (!feed || chatroomRequestInFlight || document.hidden) return;
+  const updatesUrl = feed.dataset.chatroomUpdatesUrl || "";
+  if (!updatesUrl) return;
+  const lastMessageId = feed.dataset.lastMessageId || "0";
+  chatroomRequestInFlight = true;
+  try {
+    const payload = await fetchJson(`${updatesUrl}?after=${encodeURIComponent(lastMessageId)}`, {
+      headers: { "X-Requested-With": "XMLHttpRequest" },
+    });
+    if (!payload?.ok) return;
+    const shouldStick = chatroomIsNearBottom(feed);
+    const messages = Array.isArray(payload.messages) ? payload.messages : [];
+    messages.forEach((message) => {
+      if (!message?.html) return;
+      appendChatroomMessageHtml(message.html);
+    });
+    if (payload.participants_html) updateChatroomParticipants(payload.participants_html);
+    if (typeof payload.latest_id === "number" || typeof payload.latest_id === "string") {
+      feed.dataset.lastMessageId = String(payload.latest_id || lastMessageId);
+    }
+    if (messages.length && shouldStick) feed.scrollTop = feed.scrollHeight;
+  } finally {
+    chatroomRequestInFlight = false;
+  }
+}
+
+function startChatroomPolling() {
+  if (chatroomPollingTimer || !chatroomFeedRoot()) return;
+  const feed = chatroomFeedRoot();
+  if (feed) feed.scrollTop = feed.scrollHeight;
+  refreshChatroomUpdates();
+  chatroomPollingTimer = window.setInterval(refreshChatroomUpdates, 2000);
+}
+
+async function submitChatroomForm(form) {
+  const action = form.getAttribute("action") || "";
+  if (!action) return;
+  showChatroomErrors({});
+  const feed = chatroomFeedRoot();
+  const shouldStick = feed ? chatroomIsNearBottom(feed) : true;
+  const response = await fetch(action, {
+    method: "POST",
+    headers: { "X-Requested-With": "XMLHttpRequest" },
+    body: new FormData(form),
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || !payload?.ok) {
+    showChatroomErrors(payload?.errors || { form: ["Could not send chat message."] });
+    return;
+  }
+  if (payload.message_html) appendChatroomMessageHtml(payload.message_html);
+  if (payload.participants_html) updateChatroomParticipants(payload.participants_html);
+  if (feed && payload.message_id) feed.dataset.lastMessageId = String(payload.message_id);
+  form.reset();
+  clearChatReplyTarget();
+  clearChatGifSelection();
+  showChatroomErrors({});
+  attachFileInputStatusHandlers();
+  if (feed && shouldStick) feed.scrollTop = feed.scrollHeight;
+  refreshShellState();
+}
+
+function chatGifModal() {
+  return document.querySelector("[data-chat-gif-modal]");
+}
+
+function isAllowedKlipyUrl(rawUrl) {
+  if (!rawUrl) return false;
+  try {
+    const parsed = new URL(rawUrl);
+    const hostname = parsed.hostname.toLowerCase();
+    return (
+      (parsed.protocol === "https:" || parsed.protocol === "http:") &&
+      (hostname === "klipy.com" || hostname.endsWith(".klipy.com"))
+    );
+  } catch {
+    return false;
+  }
+}
+
+function normalizeKlipyItems(payload) {
+  const items = Array.isArray(payload?.data?.data) ? payload.data.data : [];
+  return items
+    .map((item) => {
+      const file = item?.file || {};
+      const preview =
+        file?.xs?.webp?.url ||
+        file?.xs?.gif?.url ||
+        file?.sm?.jpg?.url ||
+        file?.sm?.webp?.url ||
+        file?.sm?.gif?.url ||
+        "";
+      const embed =
+        file?.sm?.gif?.url ||
+        file?.md?.gif?.url ||
+        file?.xs?.gif?.url ||
+        file?.sm?.webp?.url ||
+        "";
+      if (!isAllowedKlipyUrl(preview) || !isAllowedKlipyUrl(embed)) return null;
+      return {
+        title: item?.title || item?.slug || "GIF",
+        preview,
+        embed,
+      };
+    })
+    .filter((item) => item && item.preview && item.embed);
+}
+
+function renderChatGifResults(items) {
+  const modal = chatGifModal();
+  const grid = modal?.querySelector("[data-chat-gif-grid]") || null;
+  if (!(grid instanceof HTMLElement)) return;
+  grid.replaceChildren();
+  if (!items.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-copy";
+    empty.textContent = "No GIFs found yet. Try another search.";
+    grid.appendChild(empty);
+    return;
+  }
+  grid.append(
+    ...items.map((item, index) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "chat-gif-item";
+      button.dataset.chatGifSelect = String(index);
+      button.dataset.chatGifUrl = item.embed;
+      button.dataset.chatGifTitle = item.title;
+
+      const image = document.createElement("img");
+      image.src = item.preview;
+      image.alt = item.title;
+      image.loading = "lazy";
+
+      const label = document.createElement("span");
+      label.textContent = item.title;
+
+      button.append(image, label);
+      return button;
+    }),
+  );
+}
+
+async function searchKlipyGifs(query) {
+  const modal = chatGifModal();
+  if (!(modal instanceof HTMLElement)) return;
+  const appKey = modal.dataset.klipyAppKey || "";
+  const apiBase = (modal.dataset.klipyApiBase || "").replace(/\/$/, "");
+  const contentFilter = modal.dataset.klipyContentFilter || "medium";
+  const customerId = modal.dataset.klipyCustomerId || "guest-browser";
+  if (!appKey || !apiBase || query.trim().length < 2) {
+    renderChatGifResults([]);
+    return;
+  }
+  const locale = (navigator.language || "en-GB").split("-").pop()?.toLowerCase() || "gb";
+  const params = new URLSearchParams({
+    q: query.trim(),
+    page: "1",
+    per_page: "18",
+    customer_id: customerId,
+    locale,
+    content_filter: contentFilter,
+    format_filter: "gif,webp,jpg",
+  });
+  const payload = await fetchJson(`${apiBase}/api/v1/${encodeURIComponent(appKey)}/gifs/search?${params.toString()}`);
+  renderChatGifResults(normalizeKlipyItems(payload));
+}
+
 function setReplyTarget(postId, username) {
   const composer = document.querySelector("[data-post-composer]");
   if (!composer) return;
@@ -449,6 +750,123 @@ function attachComposerHandlers() {
   });
 }
 
+function attachChatroomHandlers() {
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+
+    if (!target.closest(".chat-message-menu")) {
+      document.querySelectorAll(".chat-message-menu[open]").forEach((node) => {
+        if (node instanceof HTMLDetailsElement) node.removeAttribute("open");
+      });
+    }
+
+    const replyButton = target.closest("[data-chat-reply-to]");
+    if (replyButton instanceof HTMLElement) {
+      event.preventDefault();
+      const messageId = replyButton.getAttribute("data-chat-reply-to");
+      const username = replyButton.getAttribute("data-chat-reply-name");
+      if (messageId && username) setChatReplyTarget(messageId, username);
+      const menu = replyButton.closest(".chat-message-menu");
+      if (menu instanceof HTMLDetailsElement) menu.removeAttribute("open");
+      return;
+    }
+
+    const quoteButton = target.closest("[data-chat-quote-to]");
+    if (quoteButton instanceof HTMLElement) {
+      event.preventDefault();
+      const sourceMessage = quoteButton.closest(".chat-message-row");
+      const messageId = quoteButton.getAttribute("data-chat-quote-to");
+      const username = quoteButton.getAttribute("data-chat-quote-name");
+      if (sourceMessage instanceof HTMLElement && messageId && username) {
+        insertChatQuote(messageId, username, sourceMessage);
+      }
+      const menu = quoteButton.closest(".chat-message-menu");
+      if (menu instanceof HTMLDetailsElement) menu.removeAttribute("open");
+      return;
+    }
+
+    if (target.closest("[data-chat-reply-clear]")) {
+      event.preventDefault();
+      clearChatReplyTarget();
+      return;
+    }
+
+    const jumpButton = target.closest("[data-chat-jump]");
+    if (jumpButton instanceof HTMLElement) {
+      event.preventDefault();
+      const targetId = jumpButton.getAttribute("data-chat-jump");
+      const message = targetId ? document.getElementById(`chat-message-${targetId}`) : null;
+      if (message instanceof HTMLElement) {
+        message.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      return;
+    }
+
+    if (target.closest("[data-chat-gif-open]")) {
+      event.preventDefault();
+      const modal = chatGifModal();
+      if (modal) modal.classList.remove("hidden");
+      const input = modal?.querySelector("[data-chat-gif-query]");
+      if (input instanceof HTMLInputElement) input.focus();
+      return;
+    }
+
+    if (target.closest("[data-chat-gif-close]") || target === chatGifModal()) {
+      event.preventDefault();
+      const modal = chatGifModal();
+      if (modal) modal.classList.add("hidden");
+      return;
+    }
+
+    if (target.closest("[data-chat-gif-clear]")) {
+      event.preventDefault();
+      clearChatGifSelection();
+      return;
+    }
+
+    const gifButton = target.closest("[data-chat-gif-select]");
+    if (gifButton instanceof HTMLElement) {
+      event.preventDefault();
+      const url = gifButton.getAttribute("data-chat-gif-url") || "";
+      const title = gifButton.getAttribute("data-chat-gif-title") || "GIF";
+      if (url) setChatGifSelection(url, title);
+      const modal = chatGifModal();
+      if (modal) modal.classList.add("hidden");
+    }
+  });
+
+  document.addEventListener("submit", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLFormElement) || !target.matches("[data-chatroom-form]")) return;
+    event.preventDefault();
+    submitChatroomForm(target);
+  });
+
+  document.addEventListener("input", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement) || !target.matches("[data-chat-gif-query]")) return;
+    if (chatGifSearchTimer) window.clearTimeout(chatGifSearchTimer);
+    chatGifSearchTimer = window.setTimeout(() => searchKlipyGifs(target.value), 220);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    let closedMenu = false;
+    document.querySelectorAll(".chat-message-menu[open]").forEach((node) => {
+      if (node instanceof HTMLDetailsElement) {
+        node.removeAttribute("open");
+        closedMenu = true;
+      }
+    });
+    if (closedMenu) return;
+    const modal = chatGifModal();
+    if (modal && !modal.classList.contains("hidden")) {
+      modal.classList.add("hidden");
+    }
+  });
+}
+
 function attachPermalinkHandlers() {
   document.addEventListener("click", async (event) => {
     const target = event.target;
@@ -505,6 +923,9 @@ function applyGuildDmVisibility() {
   document.querySelectorAll("[data-guild-dm-pill]").forEach((node) => {
     node.hidden = hiddenKeys.has(node.getAttribute("data-guild-dm-key") || "");
   });
+  document.querySelectorAll("[data-dm-conversation-key]").forEach((node) => {
+    node.hidden = hiddenKeys.has(node.getAttribute("data-dm-conversation-key") || "");
+  });
 }
 
 function attachGuildDmVisibilityHandlers() {
@@ -554,7 +975,19 @@ function attachGuildDmVisibilityHandlers() {
 
   document.addEventListener("click", (event) => {
     const target = event.target;
+    const hideButton = target instanceof HTMLElement ? target.closest("[data-hide-guild-dm]") : null;
+    if (hideButton instanceof HTMLButtonElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      writeHiddenGuildDmKeys([...hiddenGuildDmKeys(), hideButton.dataset.hideGuildDm || ""]);
+      applyGuildDmVisibility();
+      hideContextMenu();
+      return;
+    }
+
     if (target instanceof HTMLElement && target.closest("[data-shell-menu-action]") && actionButton instanceof HTMLButtonElement) {
+      event.preventDefault();
+      event.stopPropagation();
       const action = actionButton.dataset.menuAction;
       const key = actionButton.dataset.guildDmKey;
       if (action === "hide" && key) {
@@ -571,6 +1004,26 @@ function attachGuildDmVisibilityHandlers() {
 
   document.addEventListener("scroll", hideContextMenu, true);
   window.addEventListener("resize", hideContextMenu);
+}
+
+function attachFileInputStatusHandlers() {
+  const updateStatus = (input) => {
+    if (!(input instanceof HTMLInputElement)) return;
+    const targetId = input.dataset.fileCountTarget || "";
+    if (!targetId) return;
+    const status = document.getElementById(targetId);
+    if (!status) return;
+    const count = input.files?.length || 0;
+    status.textContent = count ? `${count} image${count === 1 ? "" : "s"} selected` : "PNG, JPG, GIF - up to 8 MB each";
+  };
+
+  document.querySelectorAll("input[type='file'][data-file-count-target]").forEach((input) => updateStatus(input));
+  document.addEventListener("change", (event) => {
+    const target = event.target;
+    if (target instanceof HTMLInputElement && target.type === "file" && target.dataset.fileCountTarget) {
+      updateStatus(target);
+    }
+  });
 }
 
 function updateShellCounts(payload) {
@@ -686,12 +1139,15 @@ document.addEventListener("DOMContentLoaded", () => {
   attachUserCardHandlers();
   attachVoteHandlers();
   attachComposerHandlers();
+  attachChatroomHandlers();
   attachPermalinkHandlers();
   attachBackButtonHandlers();
   attachGuildDmVisibilityHandlers();
+  attachFileInputStatusHandlers();
   initFooterLocalTime();
   hydrateEmbeds(document);
   startShellStatePolling();
+  startChatroomPolling();
   const threadStreaming = initThreadStream();
   const presenceStreaming = initPresenceStream();
   if (!threadStreaming && document.getElementById("thread-posts-root")) startPollingFallback();

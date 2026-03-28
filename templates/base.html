@@ -31,6 +31,13 @@
       <a href="{% url 'forum:home' %}" class="guild-pill guild-pill-home" aria-label="Forum home" title="Home">
         {% if branding %}{{ branding.site_name|slice:":1"|upper }}{% else %}D{% endif %}
       </a>
+      <a href="{% url 'forum:chatroom_root' %}" class="guild-pill guild-pill-chatroom" aria-label="Open chatroom" title="Chatroom">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M7 17.5 3.8 20v-4.1A7.3 7.3 0 0 1 2 11c0-4.4 4.5-8 10-8s10 3.6 10 8-4.5 8-10 8H7Z"/>
+          <path d="M8.25 10.25h7.5"/>
+          <path d="M8.25 13.75h5.2"/>
+        </svg>
+      </a>
       {% if user.is_authenticated %}
         {% if guild_dm_users %}
           {% for guild_dm_user in guild_dm_users %}

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="workspace-grid workspace-grid-thread">
+  <aside class="sidebar-pane stream-sidebar">
+    <section class="sidebar-section">
+      <div class="sidebar-heading-row">
+        <div class="sidebar-heading-main">
+          <a href="{% url 'forum:chatroom_root' %}" class="mini-action mini-action-back" data-go-back aria-label="Go back">&larr;</a>
+          <h2>Topics</h2>
+        </div>
+      </div>
+      <ul class="stream-list">
+        {% for category in categories %}
+          <li class="stream-item">
+            <a href="{% url 'forum:chatroom' category_slug=category.slug %}" class="stream-link">
+              <span class="stream-hash">#</span>
+              <span class="stream-label">{{ category.name }}</span>
+              <span class="stream-count">{{ category.thread_count }}</span>
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  </aside>
+
+  <section class="main-pane conversation-pane chatroom-pane">
+    <header class="toolbar conversation-toolbar">
+      <div>
+        <p class="eyebrow">Chatroom History</p>
+        <h1>@{{ profile_user.username }}</h1>
+        <p class="toolbar-copy">Recent messages from every live room.</p>
+      </div>
+      <div class="toolbar-status">
+        <a href="{% url 'forum:chatroom_root' %}" class="button-like">Open Chatrooms</a>
+      </div>
+    </header>
+
+    <section class="chatroom-feed-shell chatroom-history-shell">
+      <div class="chatroom-feed chatroom-feed-history">
+        {% for message in chat_messages %}
+          {% include "forum/partials/chat_message.html" with message=message %}
+        {% empty %}
+          <div class="chatroom-empty-state">
+            <h2>No chatroom posts yet</h2>
+            <p>This user has not posted in the live room.</p>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+  </section>
+
+  <aside class="sidebar-pane inspector-pane">
+    <section class="sidebar-section">
+      <h3>User Stats</h3>
+      {% include "components/user_forum_stats.html" with stats_user=profile_user %}
+    </section>
+    {% include "components/sidebar_community.html" %}
+  </aside>
+</section>
+
+<div id="user-card-overlay" class="user-card-overlay hidden"></div>
+{% endblock %}

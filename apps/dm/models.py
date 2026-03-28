@@ -3,6 +3,7 @@ from django.db import models
 from django.db.models import Q
 from django.utils import timezone
 
+from apps.core.uploads import sanitized_upload_path
 from apps.dm.crypto import decrypt_text, encrypt_text
 
 
@@ -91,7 +92,7 @@ class DirectMessage(models.Model):
 
 class DirectMessageAttachment(models.Model):
     message = models.ForeignKey(DirectMessage, on_delete=models.CASCADE, related_name="attachments")
-    file = models.FileField(upload_to="dm-attachments/%Y/%m/")
+    file = models.FileField(upload_to=sanitized_upload_path("dm-attachments"))
     original_name = models.CharField(max_length=255)
     mime_type = models.CharField(max_length=120)
     size_bytes = models.PositiveIntegerField()

@@ -1,11 +1,20 @@
+from io import BytesIO
+
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
+from PIL import Image
 
 from apps.dm.models import DirectConversation, DirectMessage, DirectMessageAttachment
 
 User = get_user_model()
+
+
+def tiny_png_upload(name: str = "photo.png") -> SimpleUploadedFile:
+    buffer = BytesIO()
+    Image.new("RGBA", (1, 1), (255, 255, 255, 255)).save(buffer, format="PNG")
+    return SimpleUploadedFile(name, buffer.getvalue(), content_type="image/png")
 
 
 class DirectMessageTests(TestCase):
@@ -36,7 +45,7 @@ class DirectMessageTests(TestCase):
         )
 
     def test_start_dm_allows_attachment_only(self):
-        image = SimpleUploadedFile("photo.png", b"fake-png-bytes", content_type="image/png")
+        image = tiny_png_upload()
 
         resp = self.client.post(
             reverse("dm:start"),

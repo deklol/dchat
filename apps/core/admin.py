@@ -70,6 +70,13 @@ class SiteBrandingAdmin(admin.ModelAdmin):
                 ),
             },
         ),
+        (
+            "Chat Integrations",
+            {
+                "description": "Optional client-side GIF search. Leave the key blank to keep KLIPY disabled.",
+                "fields": ("klipy_app_key", "klipy_content_filter"),
+            },
+        ),
     )
 
 

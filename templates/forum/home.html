@@ -17,7 +17,7 @@
       <ul class="stream-list">
         {% for category in categories %}
           <li class="stream-item">
-            <a href="{% url 'forum:home' %}?category={{ category.slug }}" class="stream-link{% if active_category_slug == category.slug %} is-active{% endif %}">
+            <a href="{% url 'forum:chatroom' category_slug=category.slug %}" class="stream-link{% if active_category_slug == category.slug %} is-active{% endif %}">
               <span class="stream-hash">#</span>
               <span class="stream-label">{{ category.name }}</span>
               <span class="stream-count">{{ category.thread_count }}</span>

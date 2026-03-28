@@ -1,0 +1,24 @@
+<section class="sidebar-section">
+  <div class="member-list-head">
+    <h3>Active Now</h3>
+    <span>{{ chatroom_participant_total }}</span>
+  </div>
+  <div class="participant-list">
+    {% for participant in chatroom_participants %}
+      <a href="{% url 'accounts:profile' username=participant.username %}" class="participant-item" data-user-card="{{ participant.username }}">
+        {% if participant.avatar %}
+          <img src="{{ participant.avatar.url }}" alt="{{ participant.username }}" class="participant-avatar" width="40" height="40">
+        {% else %}
+          <span class="participant-avatar participant-avatar-fallback" aria-hidden="true">{{ participant.username|slice:":1"|upper }}</span>
+        {% endif %}
+        <span class="participant-meta">
+          <span class="participant-name">{{ participant.username }}</span>
+          {% include "components/user_role_badge.html" with role_user=participant %}
+        </span>
+        <span class="participant-status{% if participant.is_currently_online %} is-online{% endif %}" aria-hidden="true"></span>
+      </a>
+    {% empty %}
+      <p class="empty-copy">No chatters yet.</p>
+    {% endfor %}
+  </div>
+</section>

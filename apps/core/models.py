@@ -18,6 +18,8 @@ class SiteBranding(models.Model):
     muted_text_hex = models.CharField(max_length=7, default=settings.DEFAULT_MUTED_TEXT_HEX)
     link_hex = models.CharField(max_length=7, default=settings.DEFAULT_LINK_HEX)
     border_radius_px = models.PositiveSmallIntegerField(default=10)
+    klipy_app_key = models.CharField(max_length=255, blank=True, default="")
+    klipy_content_filter = models.CharField(max_length=16, default=settings.KLIPY_CONTENT_FILTER)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

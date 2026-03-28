@@ -3,7 +3,7 @@
 <section class="form-shell">
   <div class="form-shell-head">
     <p class="eyebrow">Compose</p>
-    <h1>Create Thread</h1>
+    <h1>{% if selected_category %}New topic in #{{ selected_category.name }}{% else %}Create Thread{% endif %}</h1>
     <p class="muted">Start a new discussion with Markdown, tags, and embeds.</p>
   </div>
   <form method="post" enctype="multipart/form-data" class="form-grid post-composer standalone-composer" data-composer-root>
